@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 登录认证模块 - 纯 Streamlit 原生实现，无第三方依赖
+支持两种配置来源：Streamlit Cloud Secrets / 本地 config.yaml
 """
 import streamlit as st
 import bcrypt
@@ -10,11 +11,31 @@ import os
 CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.yaml')
 
 
-@st.cache_resource
-def load_auth_config():
-    with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
-        config = yaml.safe_load(f)
-    return config
+def get_users():
+    """从 Streamlit Secrets 或本地 config.yaml 获取用户列表"""
+    # 优先从 Streamlit Cloud Secrets 读取
+    try:
+        users = {}
+        for username in st.secrets.get("usernames", {}):
+            users[username] = {
+                "name": st.secrets["usernames"][username]["name"],
+                "password": st.secrets["usernames"][username]["password"],
+            }
+        if users:
+            return users
+    except Exception:
+        pass
+
+    # 回退到本地 config.yaml
+    if os.path.exists(CONFIG_PATH):
+        try:
+            with open(CONFIG_PATH, 'r', encoding='utf-8') as f:
+                config = yaml.safe_load(f)
+            return config['credentials']['usernames']
+        except Exception:
+            pass
+
+    return None
 
 
 def verify_password(plain_password, hashed_password):
@@ -26,21 +47,18 @@ def verify_password(plain_password, hashed_password):
 
 def check_login():
     """
-    检查登录状态，返回 (None, is_logged_in, username, name)
+    检查登录状态
     在页面最开头调用即可
     """
     if st.session_state.get('logged_in'):
-        return None, True, st.session_state.get('username'), st.session_state.get('display_name')
+        return
 
-    # 如果配置文件不存在，跳过登录
-    if not os.path.exists(CONFIG_PATH):
+    users = get_users()
+    if users is None:
         st.session_state['logged_in'] = True
         st.session_state['username'] = 'guest'
         st.session_state['display_name'] = '访客'
-        return None, True, 'guest', '访客'
-
-    config = load_auth_config()
-    users = config['credentials']['usernames']
+        return
 
     with st.form('login_form'):
         st.markdown("### 登录")
