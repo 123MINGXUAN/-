@@ -1,0 +1,39 @@
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+.env
+venv/
+.venv/
+
+# 原始数据文件（太大不上传）
+DY43*/
+DY27*/
+DY68*/
+数据需求清单.xlsx
+报表样例.xlsx
+销售数据.xlsx
+订单明细.xlsx
+
+# 模型缓存（需本地生成）
+models/product_analysis_cache.pkl
+models/_cache_parts/
+
+# 本地工具脚本
+gen_cache.py
+
+# 其他
+*.bat
+*.pdf
+*.zip
+train_error.txt
+train_output.txt
+config.yaml
+test_page.py
+模型输入/
+模型输出/
+2026-7-18工作内容/
+项目进度摘要.md
