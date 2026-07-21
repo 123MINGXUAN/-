@@ -32,6 +32,13 @@ def check_login():
     if st.session_state.get('logged_in'):
         return None, True, st.session_state.get('username'), st.session_state.get('display_name')
 
+    # 如果配置文件不存在，跳过登录
+    if not os.path.exists(CONFIG_PATH):
+        st.session_state['logged_in'] = True
+        st.session_state['username'] = 'guest'
+        st.session_state['display_name'] = '访客'
+        return None, True, 'guest', '访客'
+
     config = load_auth_config()
     users = config['credentials']['usernames']
 
