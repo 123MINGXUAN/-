@@ -31,6 +31,9 @@ gen_cache.py
 *.zip
 train_error.txt
 train_output.txt
+train_multi_shop.py
+数据模型.py
+预测模型/
 config.yaml
 test_page.py
 模型输入/
