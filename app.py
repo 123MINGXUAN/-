@@ -8,6 +8,9 @@ import pandas as pd
 import numpy as np
 import re, os, pickle, io
 from datetime import datetime
+from openpyxl import Workbook
+from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
+from openpyxl.utils import get_column_letter
 
 # ==================== 配置 ====================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -300,6 +303,16 @@ CUSTOM_CSS = """
 
 
 WEEKDAY_CN = ['星期一', '星期二', '星期三', '星期四', '星期五', '星期六', '星期日']
+
+
+def _display_width(s):
+    w = 0
+    for ch in str(s):
+        if '\u4e00' <= ch <= '\u9fff' or '\u3000' <= ch <= '\u303f' or '\uff00' <= ch <= '\uffef':
+            w += 2
+        else:
+            w += 1
+    return w
 
 
 def fmt_date_cn(ts):
@@ -876,30 +889,78 @@ with col_result:
             st.markdown('<div class="section-title">导出报表</div>', unsafe_allow_html=True)
 
             excel_buf = io.BytesIO()
-            with pd.ExcelWriter(excel_buf, engine='openpyxl') as writer:
-                for r_idx, r in enumerate(all_results):
-                    date_label = fmt_date_cn(r['date']) if not r.get('date_is_none', False) else '未选择日期'
-                    if len(all_results) == 1:
-                        sheet_name = '款式明细'
-                    else:
-                        sheet_name = date_label if not r.get('date_is_none', False) else f'文件{r_idx+1}'
+            wb = Workbook()
+            ws = wb.active
+            wb.remove(ws)
 
-                    ps = r['product_breakdown'].sort_values('sales', ascending=False)
-                    export_df = pd.DataFrame({
-                        '款式名称': ps['product'],
-                        '销售额': ps['sales'],
-                        '销售成本': ps['cost'],
-                        '毛利': ps['product_gross'],
-                        '历史退款率': ps['hist_refund'],
-                        '数据来源': ps['match_source'],
-                        '预估退款金额': ps['refund_share'],
-                        '运营成本': ps['ops_share'],
-                        '物流成本': ps['logistics_share'],
-                        '广告支出': ps['ad_share'],
-                        '预估净利润': ps['product_net'],
-                    })
-                    export_df.to_excel(writer, sheet_name=sheet_name[:31], index=False)
+            thin_border = Border(
+                left=Side(style='thin', color='000000'),
+                right=Side(style='thin', color='000000'),
+                top=Side(style='thin', color='000000'),
+                bottom=Side(style='thin', color='000000'),
+            )
+            center_align = Alignment(horizontal='center', vertical='center', wrap_text=True)
+            header_fill = PatternFill(start_color='2E75B6', end_color='2E75B6', fill_type='solid')
+            header_font = Font(bold=True, size=10, color='FFFFFF', name='微软雅黑')
+            data_font = Font(size=10, name='微软雅黑')
+            light_fill = PatternFill(start_color='D6E4F0', end_color='D6E4F0', fill_type='solid')
+            white_fill = PatternFill(start_color='FFFFFF', end_color='FFFFFF', fill_type='solid')
+            pct_cols = [5, 8]
+            money_cols = [2, 3, 4, 7, 9, 10, 11, 12]
 
+            for r_idx, r in enumerate(all_results):
+                date_label = fmt_date_cn(r['date']) if not r.get('date_is_none', False) else '未选择日期'
+                if len(all_results) == 1:
+                    sheet_name = '款式明细'
+                else:
+                    sheet_name = date_label if not r.get('date_is_none', False) else f'文件{r_idx+1}'
+
+                ws = wb.create_sheet(title=sheet_name[:31])
+
+                export_headers = ['款式名称', '销售额', '销售成本', '毛利', '历史退款率',
+                                  '数据来源', '预估退款金额', '运营成本', '物流成本', '广告支出', '预估净利润']
+
+                ps = r['product_breakdown'].sort_values('sales', ascending=False)
+
+                for col, header in enumerate(export_headers, 1):
+                    cell = ws.cell(row=1, column=col, value=header)
+                    cell.font = header_font
+                    cell.fill = header_fill
+                    cell.alignment = center_align
+                    cell.border = thin_border
+
+                for row_idx, (_, row) in enumerate(ps.iterrows(), 2):
+                    values = [row['product'], row['sales'], row['cost'], row['product_gross'],
+                              row['hist_refund'], row['match_source'], row['refund_share'],
+                              row['ops_share'], row['logistics_share'], row['ad_share'], row['product_net']]
+                    for col, value in enumerate(values, 1):
+                        cell = ws.cell(row=row_idx, column=col, value=value)
+                        cell.font = data_font
+                        cell.alignment = center_align
+                        cell.border = thin_border
+                        cell.fill = light_fill if row_idx % 2 == 0 else white_fill
+                        if col in pct_cols and isinstance(value, (int, float)):
+                            cell.number_format = '0.00%'
+                        elif col in money_cols and isinstance(value, (int, float)):
+                            cell.number_format = '#,##0.00'
+
+                for col in range(1, len(export_headers) + 1):
+                    max_len = _display_width(export_headers[col - 1])
+                    for row in range(2, len(ps) + 2):
+                        val = ws.cell(row=row, column=col).value
+                        if val is not None:
+                            if col in money_cols and isinstance(val, (int, float)):
+                                cell_len = _display_width(f'{val:,.2f}')
+                            else:
+                                cell_len = _display_width(val)
+                            if cell_len > max_len:
+                                max_len = cell_len
+                    ws.column_dimensions[get_column_letter(col)].width = max_len + 6
+
+            if wb.sheetnames:
+                wb.active = 0
+
+            wb.save(excel_buf)
             excel_buf.seek(0)
 
             dl_col1, dl_col2, dl_col3 = st.columns([1, 2, 1])
