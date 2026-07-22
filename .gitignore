@@ -20,7 +20,6 @@ DY68*/
 
 # 模型缓存
 models/_cache_parts/
-models/product_analysis_cache.pkl
 
 # 本地工具脚本
 gen_cache.py
