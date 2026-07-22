@@ -18,8 +18,7 @@ DY68*/
 销售数据.xlsx
 订单明细.xlsx
 
-# 模型缓存（需本地生成）
-models/product_analysis_cache.pkl
+# 模型缓存
 models/_cache_parts/
 
 # 本地工具脚本
